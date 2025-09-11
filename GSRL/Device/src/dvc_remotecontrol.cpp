@@ -32,14 +32,15 @@
 /**
  * @brief 构造函数，初始化遥控器接收数据地址指针和连接状态
  */
-Dr16RemoteControl::Dr16RemoteControl()
+Dr16RemoteControl::Dr16RemoteControl(fp32 stickDeadZone)
     : m_originalRxDataPointer(nullptr),
       m_rightSwitchEvent(SWITCH_EVENT_NO_UPDATE_ERROR),
       m_leftSwitchEvent(SWITCH_EVENT_NO_UPDATE_ERROR),
       m_mouseLeftKeyEvent(KEY_EVENT_NO_UPDATE_ERROR),
       m_mouseRightKeyEvent(KEY_EVENT_NO_UPDATE_ERROR),
       m_isDr16Connected(false),
-      m_isDecodeCompleted(false)
+      m_isDecodeCompleted(false),
+      m_stickDeadZone(stickDeadZone)
 {
     // 初始化键盘按键状态数组
     for (uint8_t i = 0; i < KEY_TOTAL_NUMBER; i++) {

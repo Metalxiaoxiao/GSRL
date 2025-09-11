@@ -17,6 +17,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "gsrl_common.h"
 #include "drv_uart.h"
+#include <math.h>
 
 /* Exported types ------------------------------------------------------------*/
 
@@ -129,9 +130,10 @@ private:
     bool m_isDr16Connected;
 
     bool m_isDecodeCompleted; // 解码完成标志
+    fp32 m_stickDeadZone;    // 遥控器摇杆死区
 
 public:
-    Dr16RemoteControl();
+    Dr16RemoteControl(fp32 stickDeadZone = 0.0f);
 
     void receiveRxDataFromISR(const uint8_t *data);
     void decodeRxData();
@@ -140,22 +142,22 @@ public:
     fp32 getRightStickX()
     {
         decodeRxData();
-        return m_rightStickX;
+        return applyStickDeadZone(m_rightStickX);
     }
     fp32 getRightStickY()
     {
         decodeRxData();
-        return m_rightStickY;
+        return applyStickDeadZone(m_rightStickY);
     }
     fp32 getLeftStickX()
     {
         decodeRxData();
-        return m_leftStickX;
+        return applyStickDeadZone(m_leftStickX);
     }
     fp32 getLeftStickY()
     {
         decodeRxData();
-        return m_leftStickY;
+        return applyStickDeadZone(m_leftStickY);
     }
     SwitchStatus getRightSwitchStatus()
     {
@@ -256,6 +258,17 @@ private:
                 return KEY_TOGGLE_RELEASE_PRESS;
             default:
                 return KEY_NO_CHANGE;
+        }
+    }
+
+    fp32 applyStickDeadZone(fp32 stickValue)
+    {
+        if (fabs(stickValue) < m_stickDeadZone) {
+            return 0.0f;
+        } else if (stickValue > 0.0f) {
+            return (stickValue - m_stickDeadZone) / (1.0f - m_stickDeadZone);
+        } else {
+            return (stickValue + m_stickDeadZone) / (1.0f - m_stickDeadZone);
         }
     }
 };
