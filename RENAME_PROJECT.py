@@ -105,22 +105,8 @@ class ProjectRenamer:
                 old_ioc.rename(new_ioc)
                 print(f"✓ 重命名IOC文件: {old_ioc.name} -> {new_ioc.name}")
         
-        # 2.3 重命名MDK-ARM中的.uvoptx和.uvprojx文件
+        # 2.3 重命名RTE文件夹（如果存在）
         mdk_path = cubemx_path / "MDK-ARM"
-        if mdk_path.exists():
-            old_uvoptx = mdk_path / f"{self.old_name}.uvoptx"
-            if old_uvoptx.exists():
-                new_uvoptx = mdk_path / f"{self.new_name}.uvoptx"
-                old_uvoptx.rename(new_uvoptx)
-                print(f"✓ 重命名UVOPTX文件: {old_uvoptx.name} -> {new_uvoptx.name}")
-            
-            old_uvprojx = mdk_path / f"{self.old_name}.uvprojx"
-            if old_uvprojx.exists():
-                new_uvprojx = mdk_path / f"{self.new_name}.uvprojx"
-                old_uvprojx.rename(new_uvprojx)
-                print(f"✓ 重命名UVPROJX文件: {old_uvprojx.name} -> {new_uvprojx.name}")
-        
-        # 2.4 重命名RTE文件夹（如果存在）
         rte_path = mdk_path / "RTE"
         if rte_path.exists():
             old_rte_folder = rte_path / f"_{self.old_name}"
@@ -156,12 +142,12 @@ class ProjectRenamer:
         except ValueError as e:
             validation_errors.append(f".ioc文件: {str(e)}")
         
-        # 验证.uvoptx文件
+        # 验证flash.cfg文件
         try:
-            self._validate_uvoptx_file()
-            print("✓ .uvoptx文件验证通过")
+            self._validate_flash_cfg()
+            print("✓ flash.cfg文件验证通过")
         except ValueError as e:
-            validation_errors.append(f".uvoptx文件: {str(e)}")
+            validation_errors.append(f"flash.cfg文件: {str(e)}")
         
         if validation_errors:
             error_message = "原工程名验证失败，发现以下错误：\n" + "\n".join([f"  - {error}" for error in validation_errors])
@@ -220,20 +206,19 @@ class ProjectRenamer:
         if old_project_name not in content:
             raise ValueError(f"ProjectManager.ProjectName不匹配")
     
-    def _validate_uvoptx_file(self):
-        """验证.uvoptx文件中的原工程名"""
-        uvoptx_file = self.project_root / "CubeMX_BSP" / "MDK-ARM" / f"{self.old_name}.uvoptx"
-        # 检查重命名后的文件是否存在，如果已经重命名过，则跳过验证
-        if not uvoptx_file.exists():
+    def _validate_flash_cfg(self):
+        """验证flash.cfg文件中的原工程名"""
+        flash_cfg_path = self.project_root / "flash.cfg"
+        if not flash_cfg_path.exists():
             return
         
-        with open(uvoptx_file, 'r', encoding='utf-8') as f:
+        with open(flash_cfg_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # 检查<TargetName>
-        old_target_name = f"<TargetName>{self.old_name}</TargetName>"
-        if old_target_name not in content:
-            raise ValueError(f"TargetName不匹配")
+        # 检查program行中的.elf文件名
+        old_elf_path = f"build/Debug/{self.old_name}.elf"
+        if old_elf_path not in content:
+            raise ValueError(f"program行中的.elf文件名不匹配，预期包含:{old_elf_path}")
     
     def modify_file_contents(self):
         """修改相关文件内容"""
@@ -251,11 +236,8 @@ class ProjectRenamer:
         # 3.4 修改.ioc文件
         self._modify_ioc_file()
         
-        # 3.5 修改.uvoptx文件
-        self._modify_uvoptx_file()
-        
-        # 3.6 修改.uvprojx文件
-        self._modify_uvprojx_file()
+        # 3.5 修改flash.cfg文件
+        self._modify_flash_cfg()
     
     def _modify_eide_json(self):
         """修改eide.json文件"""
@@ -367,42 +349,25 @@ class ProjectRenamer:
         
         print("✓ 修改.ioc文件完成")
     
-    def _modify_uvoptx_file(self):
-        """修改.uvoptx文件"""
-        uvoptx_file = self.project_root / "CubeMX_BSP" / "MDK-ARM" / f"{self.new_name}.uvoptx"
-        if not uvoptx_file.exists():
+    def _modify_flash_cfg(self):
+        """修改flash.cfg文件"""
+        flash_cfg_path = self.project_root / "flash.cfg"
+        if not flash_cfg_path.exists():
             return
         
-        with open(uvoptx_file, 'r', encoding='utf-8') as f:
+        with open(flash_cfg_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # 修改<TargetName>
-        old_target_name = f"<TargetName>{self.old_name}</TargetName>"
-        new_target_name = f"<TargetName>{self.new_name}</TargetName>"
+        # 修改program行中的.elf文件名
+        old_elf_path = f"build/Debug/{self.old_name}.elf"
+        new_elf_path = f"build/Debug/{self.new_name}.elf"
         
-        content = content.replace(old_target_name, new_target_name)
+        content = content.replace(old_elf_path, new_elf_path)
         
-        with open(uvoptx_file, 'w', encoding='utf-8') as f:
+        with open(flash_cfg_path, 'w', encoding='utf-8') as f:
             f.write(content)
         
-        print("✓ 修改.uvoptx文件完成")
-    
-    def _modify_uvprojx_file(self):
-        """修改.uvprojx文件"""
-        uvprojx_file = self.project_root / "CubeMX_BSP" / "MDK-ARM" / f"{self.new_name}.uvprojx"
-        if not uvprojx_file.exists():
-            return
-        
-        with open(uvprojx_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # 替换所有原工程名相关内容
-        content = content.replace(self.old_name, self.new_name)
-        
-        with open(uvprojx_file, 'w', encoding='utf-8') as f:
-            f.write(content)
-        
-        print("✓ 修改.uvprojx文件完成")
+        print("✓ 修改flash.cfg文件完成")
     
     def rename_project(self, new_name=None):
         """执行完整的项目重命名流程"""

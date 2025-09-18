@@ -16,10 +16,10 @@
             "files": [],
             "folders": [
               {
-                "name": "MDK-ARM",
+                "name": "GCC",
                 "files": [
                   {
-                    "path": "CubeMX_BSP/MDK-ARM/startup_stm32f407xx.s"
+                    "path": "CubeMX_BSP/startup_stm32f407xx.s"
                   }
                 ],
                 "folders": []
@@ -86,6 +86,12 @@
                   },
                   {
                     "path": "CubeMX_BSP/Src/stm32f4xx_hal_timebase_tim.c"
+                  },
+                  {
+                    "path": "CubeMX_BSP/Src/syscalls.c"
+                  },
+                  {
+                    "path": "CubeMX_BSP/Src/sysmem.c"
                   }
                 ],
                 "folders": []
@@ -238,7 +244,7 @@
                     "path": "CubeMX_BSP/Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_4.c"
                   },
                   {
-                    "path": "CubeMX_BSP/Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/port.c"
+                    "path": "CubeMX_BSP/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/port.c"
                   }
                 ],
                 "folders": []
@@ -432,50 +438,18 @@
   "targets": {
     "GMStdRobotLib": {
       "excludeList": [],
-      "toolchain": "AC5",
+      "toolchain": "GCC",
       "compileConfig": {
         "cpuType": "Cortex-M4",
+        "archExtensions": "",
         "floatingPointHardware": "single",
-        "scatterFilePath": "",
-        "useCustomScatterFile": false,
+        "scatterFilePath": "CubeMX_BSP/STM32F407XX_FLASH.ld",
+        "useCustomScatterFile": true,
         "storageLayout": {
-          "RAM": [
-            {
-              "tag": "IRAM",
-              "id": 1,
-              "mem": {
-                "startAddr": "0x20000000",
-                "size": "0x00020000"
-              },
-              "isChecked": true,
-              "noInit": false
-            },
-            {
-              "tag": "IRAM",
-              "id": 2,
-              "mem": {
-                "startAddr": "0x10000000",
-                "size": "0x00010000"
-              },
-              "isChecked": true,
-              "noInit": false
-            }
-          ],
-          "ROM": [
-            {
-              "tag": "IROM",
-              "id": 1,
-              "mem": {
-                "startAddr": "0x08000000",
-                "size": "0x00100000"
-              },
-              "isChecked": true,
-              "isStartup": true
-            }
-          ]
+          "RAM": [],
+          "ROM": []
         },
-        "options": "null",
-        "archExtensions": ""
+        "options": "null"
       },
       "uploader": "OpenOCD",
       "uploadConfig": {
@@ -523,7 +497,7 @@
           "CubeMX_BSP/Drivers/STM32F4xx_HAL_Driver/Inc/Legacy",
           "CubeMX_BSP/Middlewares/Third_Party/FreeRTOS/Source/include",
           "CubeMX_BSP/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2",
-          "CubeMX_BSP/Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F",
+          "CubeMX_BSP/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F",
           "CubeMX_BSP/Middlewares/ST/STM32_USB_Device_Library/Core/Inc",
           "CubeMX_BSP/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc",
           "CubeMX_BSP/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
@@ -567,6 +541,40 @@
             "output-format": "elf",
             "ro-base": "0x08000000",
             "rw-base": "0x20000000"
+          }
+        },
+        "GCC": {
+          "version": 5,
+          "beforeBuildTasks": [],
+          "afterBuildTasks": [],
+          "global": {
+            "$float-abi-type": "hard",
+            "output-debug-info": "enable",
+            "use-newlib-nano": true,
+            "not-use-syscalls": true,
+            "misc-control": ""
+          },
+          "c/cpp-compiler": {
+            "language-c": "c11",
+            "language-cpp": "c++11",
+            "optimization": "level-debug",
+            "warnings": "all-warnings",
+            "one-elf-section-per-function": true,
+            "one-elf-section-per-data": true,
+            "C_FLAGS": "",
+            "CXX_FLAGS": ""
+          },
+          "asm-compiler": {
+            "ASM_FLAGS": ""
+          },
+          "linker": {
+            "$outputTaskExcludes": [
+              ".bin"
+            ],
+            "output-format": "elf",
+            "remove-unused-input-sections": true,
+            "LD_FLAGS": "",
+            "LIB_FLAGS": "-lm"
           }
         }
       }

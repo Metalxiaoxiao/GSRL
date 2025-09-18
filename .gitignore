@@ -17,12 +17,6 @@
 # chip support pack
 /.pack
 
-# MDK-ARM
-*/MDK-ARM/*
-!*/MDK-ARM/*.uvprojx
-!*/MDK-ARM/*.uvoptx
-!*/MDK-ARM/*.s
-
 # Prerequisites
 *.d
 
