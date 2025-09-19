@@ -355,6 +355,9 @@
               },
               {
                 "path": "CubeMX_BSP/DSP/Source/TransformFunctions/TransformFunctionsF16.c"
+              },
+              {
+                "path": "CubeMX_BSP/DSP/Source/WindowFunctions/WindowFunctions.c"
               }
             ],
             "folders": []
