@@ -43,7 +43,6 @@ BMI088 imu(&ahrs, {&hspi1, GPIOA, GPIO_PIN_4}, {&hspi1, GPIOB, GPIO_PIN_0}, cali
 GSRLMath::Vector3f eulerAngle;
 
 /* Variables -----------------------------------------------------------------*/
-can_rx_message_t rxMessage[16]; // CAN接收消息缓冲区
 
 /* Function prototypes -------------------------------------------------------*/
 extern "C" void dr16ITCallback(uint8_t *Buffer, uint16_t Length);
@@ -52,7 +51,6 @@ inline void transmitMotorsControlData();
 
 /* User code -----------------------------------------------------------------*/
 
-uint8_t txData, rxData;
 /**
  * @brief 测试任务
  * @param argument 任务参数
@@ -75,7 +73,7 @@ extern "C" void test_task(void *argument)
         count ++;
         if (count>1000)
         {
-            angle = GSRLMath::normalizeAngle(angle + MATH_PI * 2 / 3);
+            angle = GSRLMath::normalizeAngle(MATH_PI * 2 / 3 + angle);
             count = 0;
         }
         motor.angleClosedloopControl(angle);

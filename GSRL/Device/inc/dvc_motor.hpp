@@ -152,7 +152,7 @@ public:
 class MotorDM4310 : public Motor
 {
 public:
-    enum DMMotorState
+    enum DMMotorState : uint8_t
     {
         DISABLE = 0x00,
         ENABLE = 0x01,
