@@ -130,7 +130,7 @@ void Dr16RemoteControl::decodeRxData()
         m_isConnected = false;
         return;
     }
-    // 解码遥控器数据, 每次接收数据仅解E码一次
+    // 解码遥控器数据, 每次接收数据仅解码一次
     if (m_isDecodeCompleted) return;
     m_rightStickX       = (fp32)(m_originalRxDataPointer->Channel_0 - 1024) / 660.0f;
     m_rightStickY       = (fp32)(m_originalRxDataPointer->Channel_1 - 1024) / 660.0f;

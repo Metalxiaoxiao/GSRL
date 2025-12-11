@@ -57,7 +57,7 @@ public:
         KEY_NO_CHANGE,
         KEY_TOGGLE_PRESS_RELEASE,
         KEY_TOGGLE_RELEASE_PRESS,
-        KEY_EVENT_NO_UPDATE_ERROR = -1//防止updateEvent()函数是否提前调用
+        KEY_EVENT_NO_UPDATE_ERROR = -1 //防止updateEvent()函数是否提前调用
     };
 
 protected:
