@@ -15,6 +15,11 @@
 
 #include "gsrl_common.h"
 #include "dvc_motor.hpp"
+<<<<<<< Updated upstream
+=======
+#include "alg_filter.hpp"  // RLSFilter
+
+>>>>>>> Stashed changes
 
 #define DEFAULT_K1                   0.22f
 #define DEFAULT_K2                   1.2f
