@@ -15,6 +15,8 @@
 
 #include "gsrl_common.h"
 #include "dvc_motor.hpp"
+#include "alg_filter.hpp"  // RLSFilter
+
 
 #define DEFAULT_K1                   0.22f
 #define DEFAULT_K2                   1.2f

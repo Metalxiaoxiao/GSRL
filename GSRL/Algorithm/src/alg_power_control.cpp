@@ -196,6 +196,7 @@ float *PowerManager::getControlledOutput(PowerObj *objs[4])
     fp32 k0[4]       = {0.0f, 0.0f, 0.0f, 0.0f};
     bool objValid[4] = {false, false, false, false};
     bool k0Valid[4]  = {false, false, false, false};
+    bool hasInvalidK0 = false;
     fp32 k1Local     = 0.0f;
     fp32 k2Local     = 0.0f;
     fp32 k3Local     = 0.0f;
@@ -217,6 +218,10 @@ float *PowerManager::getControlledOutput(PowerObj *objs[4])
             k0[i]      = motors[i]->getKA() * motors[i]->getGearboxRatio() *
                      motors[i]->getCurrentLimit() / motors[i]->getOutputLimit();
             k0Valid[i] = k0[i] > 0.0f;
+        }
+        if (objValid[i] && motors[i] != nullptr && motors[i]->isMotorConnected() == true && !k0Valid[i]) {
+            // 有效电机缺少k0时，限功回退为等比缩放
+            hasInvalidK0 = true;
         }
     }
 
@@ -263,6 +268,19 @@ float *PowerManager::getControlledOutput(PowerObj *objs[4])
     taskEXIT_CRITICAL();
 
     if (sumCmdPower > maxPower) {
+        if (hasInvalidK0) {
+            // k0不完整时采用等比缩放，保证总功率不超限
+            fp32 scale = maxPower / sumCmdPower;
+            for (int i = 0; i < 4; i++) {
+                if (motors[i] != nullptr && motors[i]->isMotorConnected() == true && objValid[i]) {
+                    newTorqueCurrent[i] = clampAbs(objs[i]->pidOutput * scale, objs[i]->pidMaxOutput);
+                } else {
+                    newTorqueCurrent[i] = 0.0f;
+                }
+            }
+            return newTorqueCurrent;
+        }
+
         fp32 errorConfidence = 0.0f;
         if (sumError > ERROR_POWER_DISTRIBUTION_SET) {
             errorConfidence = 1.0f;
@@ -282,7 +300,7 @@ float *PowerManager::getControlledOutput(PowerObj *objs[4])
                 fp32 powerWeightProp  = (sumPowerRequired > 1e-5f) ? (cmdPower[i] / sumPowerRequired) : 0.0f;
                 fp32 powerWeight      = errorConfidence * powerWeightError + (1.0f - errorConfidence) * powerWeightProp;
                 fp32 delta            = p->currentAngularVelocity * p->currentAngularVelocity -
-                             4.0f * k2Local * (k1Local * fabsf(p->currentAngularVelocity) + k3Local / 4.0f - powerWeight * allocatablePower);
+                                 4.0f * k2Local * (k1Local * fabsf(p->currentAngularVelocity) + k3Local / 4.0f - powerWeight * allocatablePower);
                 if (floatEqual(delta, 0.0f)) {
                     newTorqueCurrent[i] = -p->currentAngularVelocity / (2.0f * k2Local) / k0[i];
                 } else if (delta > 0.0f) {
@@ -319,6 +337,7 @@ void PowerManager::powerDaemon(void *pvParam)
 {
     PowerManager *self  = static_cast<PowerManager *>(pvParam);
     fp32 effectivePower = 0.0f;
+    static bool wasMeterConnected = false;
 
     vTaskDelay(pdMS_TO_TICKS(1000));
     self->lastUpdateTick = (uint32_t)xTaskGetTickCount();
@@ -352,15 +371,15 @@ void PowerManager::powerDaemon(void *pvParam)
 
         self->estimatedPower = self->k1 * sampleAv + self->k2 * sampleT2 + effectivePower + self->k3;
         bool meterConnected = (self->powerMeter != nullptr && self->powerMeter->isConnected());
-        // 根据功率计在线状态自动启用RLS更新
-        self->rlsEnabled = meterConnected ? 1U : 0U;
+        // 仅当用户允许且功率计在线时才更新RLS参数
+        bool rlsActive = (self->rlsEnabled != 0U) && meterConnected;
 
         if (meterConnected) {
             self->measuredPower = self->powerMeter->getPower();
         } else {
             // 功率计断连时回退到默认参数
             self->measuredPower = self->estimatedPower;
-            if (self->rlsEnabled != 0U) {
+            if (self->rlsEnabled != 0U && wasMeterConnected) {
                 taskENTER_CRITICAL();
                 self->k1 = self->defaultK1;
                 self->k2 = self->defaultK2;
@@ -374,7 +393,7 @@ void PowerManager::powerDaemon(void *pvParam)
             }
         }
 
-        if (self->rlsEnabled != 0U && meterConnected && fabsf(self->measuredPower) > 5.0f) {
+        if (rlsActive && fabsf(self->measuredPower) > 5.0f) {
             // 使用功率计实测功率更新k1/k2
             fp32 output = self->measuredPower - effectivePower - self->k3;
             // 创建输入向量
@@ -402,7 +421,7 @@ void PowerManager::powerDaemon(void *pvParam)
         taskEXIT_CRITICAL();
 
         self->lastUpdateTick = (uint32_t)xTaskGetTickCount();
+        wasMeterConnected = meterConnected;
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
-
