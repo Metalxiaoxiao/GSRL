@@ -61,6 +61,9 @@ protected:
     fp32 m_controllerOutput;
     bool m_controllerOutputPolarity;
     uint16_t m_encoderOffset;
+    fp32 m_torqueConst;
+    fp32 m_currentLimit;
+    fp32 m_outputLimit;
 
 public:
     virtual ~Motor() = default;
@@ -78,8 +81,15 @@ public:
     void resetCurrentRevolutionsToZero();
     fp32 getCurrentRevolutions() const;
     int16_t getCurrentTorqueCurrent() const;
+    fp32 getRPMFeedback() const;
+    fp32 getTorqueFeedback() const;
+    uint8_t getDisconnectCounter() const;
+    fp32 getOutputLimit() const;
+    fp32 getCurrentLimit() const;
+    fp32 getKA() const;
+    virtual fp32 getGearboxRatio() const;
     int8_t getTemperature() const;
-    bool isMotorConected() const;
+    bool isMotorConnected() const;
     // 设置目标状态相关
     void setTargetAngle(fp32 targetAngle);
     void setTargetAngularVelocity(fp32 targetAngularVelocity);
@@ -88,6 +98,9 @@ public:
     // 控制器相关
     void setController(Controller *controller);
     void setControllerOutputPolarity(bool polarity);
+    void setTorqueConst(fp32 torqueConst);
+    void setCurrentLimit(fp32 currentLimit);
+    void setOutputLimit(fp32 outputLimit);
     void openloopControl(fp32 controlValue);
     fp32 angleClosedloopControl();
     fp32 angleClosedloopControl(fp32 targetAngle);
@@ -140,6 +153,7 @@ protected:
 
 public:
     MotorM3508(uint8_t dji3508MotorID, Controller *controller, uint16_t encoderOffset = 0, fp32 gearboxRatio = 1.0f);
+    fp32 getGearboxRatio() const override;
 
 protected:
     bool decodeCanRxMessage(const can_rx_message_t &rxMessage) override;

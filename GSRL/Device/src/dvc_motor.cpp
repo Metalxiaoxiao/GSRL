@@ -152,6 +152,15 @@ fp32 Motor::getCurrentAngularVelocity() const
 }
 
 /**
+ * @brief Get current motor speed in RPM
+ * @return fp32 motor speed in RPM
+ */
+fp32 Motor::getRPMFeedback() const
+{
+    return m_currentAngularVelocity * 30.0f / (fp32)MATH_PI;
+}
+
+/**
  * @brief 电机旋转圈数清零
  */
 void Motor::resetCurrentRevolutionsToZero()
@@ -181,6 +190,64 @@ int16_t Motor::getCurrentTorqueCurrent() const
 }
 
 /**
+ * @brief Get estimated motor torque feedback
+ * @return fp32 torque feedback in N.m
+ */
+fp32 Motor::getTorqueFeedback() const
+{
+    if (m_outputLimit <= 0.0f || m_currentLimit <= 0.0f || m_torqueConst <= 0.0f) {
+        return 0.0f;
+    }
+    fp32 current = (fp32)m_currentTorqueCurrent * (m_currentLimit / m_outputLimit);
+    return current * m_torqueConst * getGearboxRatio();
+}
+
+/**
+ * @brief Get motor disconnect counter
+ * @return uint8_t disconnect counter
+ */
+uint8_t Motor::getDisconnectCounter() const
+{
+    return m_motorFeedbackErrorCount;
+}
+
+/**
+ * @brief Get motor output limit
+ * @return fp32 output limit
+ */
+fp32 Motor::getOutputLimit() const
+{
+    return m_outputLimit;
+}
+
+/**
+ * @brief Get motor current limit
+ * @return fp32 current limit
+ */
+fp32 Motor::getCurrentLimit() const
+{
+    return m_currentLimit;
+}
+
+/**
+ * @brief Get motor torque constant
+ * @return fp32 torque constant (N.m/A)
+ */
+fp32 Motor::getKA() const
+{
+    return m_torqueConst;
+}
+
+/**
+ * @brief Get motor reduction ratio
+ * @return fp32 reduction ratio
+ */
+fp32 Motor::getGearboxRatio() const
+{
+    return 1.0f;
+}
+
+/**
  * @brief 获取电机当前温度
  * @return uint8_t 电机当前温度 单位℃
  */
@@ -194,7 +261,7 @@ int8_t Motor::getTemperature() const
  * @return true 电机连接正常
  * @return false 电机连接异常
  */
-bool Motor::isMotorConected() const
+bool Motor::isMotorConnected() const
 {
     return m_isMotorConnected;
 }
@@ -251,6 +318,33 @@ void Motor::setController(Controller *controller)
 void Motor::setControllerOutputPolarity(bool polarity)
 {
     m_controllerOutputPolarity = polarity;
+}
+
+/**
+ * @brief Set motor torque constant
+ * @param torqueConst torque constant (N.m/A)
+ */
+void Motor::setTorqueConst(fp32 torqueConst)
+{
+    m_torqueConst = torqueConst;
+}
+
+/**
+ * @brief Set motor current limit
+ * @param currentLimit current limit (A)
+ */
+void Motor::setCurrentLimit(fp32 currentLimit)
+{
+    m_currentLimit = currentLimit;
+}
+
+/**
+ * @brief Set motor output limit
+ * @param outputLimit output limit
+ */
+void Motor::setOutputLimit(fp32 outputLimit)
+{
+    m_outputLimit = outputLimit;
 }
 
 /**
@@ -415,7 +509,10 @@ Motor::Motor(uint32_t canControlID, uint32_t canFeedbackID, Controller *controll
       m_controller(controller),
       m_controllerOutput(0.0f),
       m_controllerOutputPolarity(false),
-      m_encoderOffset(encoderOffset)
+      m_encoderOffset(encoderOffset),
+      m_torqueConst(0.0f),
+      m_currentLimit(0.0f),
+      m_outputLimit(0.0f)
 {
     m_motorControlHeader.DLC   = 8;
     m_motorControlHeader.IDE   = CAN_ID_STD;
@@ -485,7 +582,12 @@ MotorGM6020::MotorGM6020(uint8_t dji6020MotorID, Controller *controller, uint16_
             dji6020MotorID + 0x204,
             controller,
             encoderOffset),
-      m_djiMotorID(dji6020MotorID) {}
+      m_djiMotorID(dji6020MotorID)
+{
+    setTorqueConst(0.741f);
+    setCurrentLimit(1.62f);
+    setOutputLimit(16384.0f);
+}
 
 /**
  * @brief 将控制器输出转换为GM6020电机CAN控制数据
@@ -579,6 +681,9 @@ MotorM3508::MotorM3508(uint8_t dji3508MotorID, Controller *controller, uint16_t 
     m_motorControlMessageID    = dji3508MotorID < 5 ? 0x200 : 0x1FF;
     m_motorFeedbackMessageID   = dji3508MotorID + 0x200;
     m_motorControlHeader.StdId = m_motorControlMessageID;
+    setTorqueConst(0.3f);
+    setCurrentLimit(20.0f);
+    setOutputLimit(16384.0f);
 }
 
 /**
@@ -597,6 +702,15 @@ bool MotorM3508::decodeCanRxMessage(const can_rx_message_t &rxMessage)
         return true;
     }
     return false;
+}
+
+/**
+ * @brief Get motor reduction ratio
+ * @return fp32 reduction ratio
+ */
+fp32 MotorM3508::getGearboxRatio() const
+{
+    return m_gearboxRatio;
 }
 
 /******************************************************************************

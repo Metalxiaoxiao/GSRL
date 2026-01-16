@@ -821,10 +821,316 @@ public:
     }
 };
 
+/**
+ * @brief 递归最小二乘（RLS）滤波器
+ * @details 用于系统参数辨识和自适应滤波，支持遗忘因子和正则化
+ */
+template <typename T = fp32, int ParameterSize = 1>
+class RLSFilter : public Filter<T>
+{
+public:
+    // Eigen矩阵类型定义
+    using ParameterVector = Eigen::Vector<T, ParameterSize>;
+    using CovarianceMatrix = Eigen::Matrix<T, ParameterSize, ParameterSize>;
+    using InputVector = Eigen::Vector<T, ParameterSize>;
+
+private:
+    ParameterVector m_parameters;      // 参数向量 θ
+    CovarianceMatrix m_covariance;     // 协方差矩阵 P
+    T m_forgettingFactor;              // 遗忘因子 λ (0 < λ ≤ 1)
+    T m_regularization;                // 正则化参数 δ
+    bool m_isInitialized;              // 是否已初始化
+    int m_updateCount;                 // 更新次数
+
+    // 数值稳定性相关
+    static constexpr T EPSILON = static_cast<T>(1e-6f);
+    static constexpr T DEFAULT_FORGETTING_FACTOR = static_cast<T>(0.99);
+    static constexpr T DEFAULT_REGULARIZATION = static_cast<T>(1e-3);
+
+public:
+    /**
+     * @brief 默认构造函数
+     * @details 初始化RLS滤波器，使用默认遗忘因子和正则化参数
+     */
+    RLSFilter()
+        : m_forgettingFactor(DEFAULT_FORGETTING_FACTOR),
+          m_regularization(DEFAULT_REGULARIZATION),
+          m_isInitialized(false),
+          m_updateCount(0)
+    {
+        reset();
+    }
+
+    /**
+     * @brief 参数化构造函数
+     * @param forgettingFactor 遗忘因子 λ (0 < λ ≤ 1)，越接近1记忆越长
+     * @param regularization 正则化参数 δ，防止协方差矩阵奇异
+     */
+    explicit RLSFilter(T forgettingFactor, T regularization = DEFAULT_REGULARIZATION)
+        : m_forgettingFactor(forgettingFactor),
+          m_regularization(regularization),
+          m_isInitialized(false),
+          m_updateCount(0)
+    {
+        // 参数检查
+        if (m_forgettingFactor <= EPSILON || m_forgettingFactor > 1.0) {
+            m_forgettingFactor = DEFAULT_FORGETTING_FACTOR;
+        }
+        if (m_regularization < EPSILON) {
+            m_regularization = DEFAULT_REGULARIZATION;
+        }
+        
+        reset();
+    }
+
+    /**
+     * @brief 滤波计算（一维接口，兼容基类）
+     * @details 对于RLS滤波器，输入应为测量值，输出为预测值
+     * @param input 输入测量值
+     * @return 预测输出值（需要先调用update进行参数估计）
+     */
+    T filterCalculate(T input) override
+    {
+        // RLS滤波器主要用于参数估计，此接口返回当前参数估计的某种度量
+        // 对于一维情况，返回第一个参数值
+        if constexpr (ParameterSize == 1) {
+            return m_parameters(0);
+        } else {
+            // 多维情况下返回参数向量的范数
+            return m_parameters.norm();
+        }
+    }
+
+    /**
+     * @brief RLS参数更新
+     * @param inputVector 输入向量 φ (回归向量)
+     * @param measurement 测量值 y
+     * @return 预测误差 e = y - φ^T * θ
+     */
+    T update(const InputVector &inputVector, T measurement)
+    {
+        // 检查是否已初始化
+        if (!m_isInitialized) {
+            initialize(inputVector, measurement);
+            return measurement; // 第一次更新返回测量值本身
+        }
+
+        // 计算预测值 y_hat = φ^T * θ
+        T prediction = inputVector.dot(m_parameters);
+        
+        // 计算预测误差 e = y - y_hat
+        T error = measurement - prediction;
+
+        // RLS核心算法
+        performRLSUpdate(inputVector, error);
+
+        // 更新计数器
+        m_updateCount++;
+
+        return error;
+    }
+
+    /**
+     * @brief 重置滤波器
+     */
+    void reset() override
+    {
+        m_parameters.setZero();
+        m_covariance = CovarianceMatrix::Identity() * (1.0 / m_regularization);
+        m_isInitialized = false;
+        m_updateCount = 0;
+    }
+
+    /**
+     * @brief 获取当前参数估计
+     */
+    const ParameterVector &getParameters() const
+    {
+        return m_parameters;
+    }
+
+    /**
+     * @brief 获取协方差矩阵
+     */
+    const CovarianceMatrix &getCovariance() const
+    {
+        return m_covariance;
+    }
+
+    /**
+     * @brief 设置遗忘因子
+     * @param lambda 遗忘因子 (0 < λ ≤ 1)
+     */
+    void setForgettingFactor(T lambda)
+    {
+        if (lambda > EPSILON && lambda <= 1.0) {
+            m_forgettingFactor = lambda;
+        }
+    }
+
+    /**
+     * @brief 获取遗忘因子
+     */
+    T getForgettingFactor() const
+    {
+        return m_forgettingFactor;
+    }
+
+    /**
+     * @brief 设置正则化参数
+     * @param delta 正则化参数
+     */
+    void setRegularization(T delta)
+    {
+        if (delta >= EPSILON) {
+            m_regularization = delta;
+        }
+    }
+
+    /**
+     * @brief 获取正则化参数
+     */
+    T getRegularization() const
+    {
+        return m_regularization;
+    }
+
+    /**
+     * @brief 检查滤波器是否已初始化
+     */
+    bool isInitialized() const
+    {
+        return m_isInitialized;
+    }
+
+    /**
+     * @brief 获取更新次数
+     */
+    int getUpdateCount() const
+    {
+        return m_updateCount;
+    }
+
+    /**
+     * @brief 设置初始参数值
+     */
+    void setInitialParameters(const ParameterVector &theta0)
+    {
+        m_parameters = theta0;
+        m_isInitialized = true;
+    }
+
+    /**
+     * @brief 设置初始协方差矩阵
+     */
+    void setInitialCovariance(const CovarianceMatrix &P0)
+    {
+        m_covariance = P0;
+    }
+
+    /**
+     * @brief 预测输出值
+     * @param inputVector 输入向量 φ
+     * @return 预测值 y_hat = φ^T * θ
+     */
+    T predict(const InputVector &inputVector) const
+    {
+        if (!m_isInitialized) {
+            return T{};
+        }
+        return inputVector.dot(m_parameters);
+    }
+
+private:
+    /**
+     * @brief 初始化滤波器
+     */
+    void initialize(const InputVector &inputVector, T measurement)
+    {
+        // 简单初始化：如果输入向量不为零，则用第一个测量值初始化
+        if (inputVector.norm() > EPSILON) {
+            // θ = y / (φ^T φ) * φ
+            T denominator = inputVector.squaredNorm();
+            if (denominator > EPSILON) {
+                m_parameters = (measurement / denominator) * inputVector;
+            } else {
+                m_parameters.setZero();
+            }
+        } else {
+            m_parameters.setZero();
+        }
+        
+        m_isInitialized = true;
+        m_updateCount = 1;
+    }
+
+    /**
+     * @brief 执行RLS更新
+     */
+    void performRLSUpdate(const InputVector &inputVector, T error)
+    {
+        // 计算增益向量 K = P * φ / (λ + φ^T * P * φ)
+        T denominator = m_forgettingFactor + inputVector.dot(m_covariance * inputVector);
+        
+        // 防止分母为零
+        if (denominator < EPSILON) {
+            denominator = EPSILON;
+        }
+        
+        // 计算增益向量
+        ParameterVector gain = m_covariance * inputVector / denominator;
+
+        // 更新参数估计 θ = θ + K * e
+        m_parameters += gain * error;
+
+        // 更新协方差矩阵 P = (P - K * φ^T * P) / λ
+        // 使用更稳定的公式：P = (I - K * φ^T) * P / λ
+        CovarianceMatrix I = CovarianceMatrix::Identity();
+        m_covariance = (I - gain * inputVector.transpose()) * m_covariance / m_forgettingFactor;
+
+        // 添加数值稳定性保护
+        ensureNumericalStability();
+    }
+
+    /**
+     * @brief 确保数值稳定性
+     */
+    void ensureNumericalStability()
+    {
+        // 确保协方差矩阵对称
+        m_covariance = (m_covariance + m_covariance.transpose()) * 0.5;
+
+        // 确保协方差矩阵正定（添加小的正则化项）
+        for (int i = 0; i < ParameterSize; ++i) {
+            if (m_covariance(i, i) < m_regularization) {
+                m_covariance(i, i) = m_regularization;
+            }
+        }
+    }
+};
+
 /* Exported constants --------------------------------------------------------*/
 
 /* Exported macro ------------------------------------------------------------*/
 
 /* Exported functions prototypes ---------------------------------------------*/
+
+// RLS滤波器工厂函数声明
+using RLSFilter2D = RLSFilter<fp32, 2>;
+using RLSFilter3D = RLSFilter<fp32, 3>;
+using RLSFilter4D = RLSFilter<fp32, 4>;
+
+RLSFilter2D createFirstOrderRLS(fp32 forgettingFactor = 0.98f, fp32 regularization = 1e-4f);
+RLSFilter3D createSecondOrderRLS(fp32 forgettingFactor = 0.98f, fp32 regularization = 1e-4f);
+RLSFilter4D createThirdOrderRLS(fp32 forgettingFactor = 0.98f, fp32 regularization = 1e-4f);
+
+template<int Order>
+RLSFilter<fp32, Order> createARModelRLS(fp32 forgettingFactor = 0.98f, fp32 regularization = 1e-4f);
+
+template<int FilterLength>
+RLSFilter<fp32, FilterLength> createFIRRLS(fp32 forgettingFactor = 0.98f, fp32 regularization = 1e-4f);
+
+template<int NumParams>
+RLSFilter<fp32, NumParams> createSystemIdentificationRLS(fp32 forgettingFactor = 0.98f, fp32 regularization = 1e-4f);
 
 /* Defines -------------------------------------------------------------------*/

@@ -222,3 +222,156 @@ KalmanFilter<fp32, 4, 2, 2> create2DPosVelControlKF(fp32 dt,
 
     return kf;
 }
+
+/******************************************************************************
+ *                         RLSFilter工厂函数
+ ******************************************************************************/
+
+// 常用的RLS滤波器类型别名
+// 一阶系统参数估计（2个参数）
+using RLSFilter2D = RLSFilter<fp32, 2>;
+
+// 二阶系统参数估计（3个参数）
+using RLSFilter3D = RLSFilter<fp32, 3>;
+
+// 三阶系统参数估计（4个参数）
+using RLSFilter4D = RLSFilter<fp32, 4>;
+
+/**
+ * @brief 创建一阶系统RLS滤波器（y = a0 + a1*x）
+ * @param forgettingFactor 遗忘因子（0.95-1.0）
+ * @param regularization 正则化参数
+ * @return 配置好的RLS滤波器
+ */
+RLSFilter2D createFirstOrderRLS(fp32 forgettingFactor, fp32 regularization)
+{
+    RLSFilter2D rls(forgettingFactor, regularization);
+    
+    // 初始化参数向量为零
+    RLSFilter2D::ParameterVector params;
+    params << 0, 0;
+    rls.setInitialParameters(params);
+    
+    // 初始化协方差矩阵为单位矩阵
+    RLSFilter2D::CovarianceMatrix P;
+    P << 1, 0,
+         0, 1;
+    rls.setInitialCovariance(P);
+    
+    return rls;
+}
+
+/**
+ * @brief 创建二阶系统RLS滤波器（y = a0 + a1*x + a2*x²）
+ * @param forgettingFactor 遗忘因子（0.95-1.0）
+ * @param regularization 正则化参数
+ * @return 配置好的RLS滤波器
+ */
+RLSFilter3D createSecondOrderRLS(fp32 forgettingFactor, fp32 regularization)
+{
+    RLSFilter3D rls(forgettingFactor, regularization);
+    
+    // 初始化参数向量为零
+    RLSFilter3D::ParameterVector params;
+    params << 0, 0, 0;
+    rls.setInitialParameters(params);
+    
+    // 初始化协方差矩阵为单位矩阵
+    RLSFilter3D::CovarianceMatrix P;
+    P << 1, 0, 0,
+         0, 1, 0,
+         0, 0, 1;
+    rls.setInitialCovariance(P);
+    
+    return rls;
+}
+
+/**
+ * @brief 创建三阶系统RLS滤波器（y = a0 + a1*x + a2*x² + a3*x³）
+ * @param forgettingFactor 遗忘因子（0.95-1.0）
+ * @param regularization 正则化参数
+ * @return 配置好的RLS滤波器
+ */
+RLSFilter4D createThirdOrderRLS(fp32 forgettingFactor, fp32 regularization)
+{
+    RLSFilter4D rls(forgettingFactor, regularization);
+    
+    // 初始化参数向量为零
+    RLSFilter4D::ParameterVector params;
+    params << 0, 0, 0, 0;
+    rls.setInitialParameters(params);
+    
+    // 初始化协方差矩阵为单位矩阵
+    RLSFilter4D::CovarianceMatrix P;
+    P << 1, 0, 0, 0,
+         0, 1, 0, 0,
+         0, 0, 1, 0,
+         0, 0, 0, 1;
+    rls.setInitialCovariance(P);
+    
+    return rls;
+}
+
+/**
+ * @brief 创建AR模型RLS滤波器（自回归模型）
+ * @param order 模型阶数
+ * @param forgettingFactor 遗忘因子（0.95-1.0）
+ * @param regularization 正则化参数
+ * @return 配置好的RLS滤波器
+ */
+template<int Order>
+RLSFilter<fp32, Order> createARModelRLS(fp32 forgettingFactor, fp32 regularization)
+{
+    RLSFilter<fp32, Order> rls(forgettingFactor, regularization);
+    
+    // 初始化参数向量为零
+    typename RLSFilter<fp32, Order>::ParameterVector params;
+    params.setZero();
+    rls.setInitialParameters(params);
+    
+    // 初始化协方差矩阵为单位矩阵
+    typename RLSFilter<fp32, Order>::CovarianceMatrix P;
+    P.setIdentity();
+    rls.setInitialCovariance(P);
+    
+    return rls;
+}
+
+/**
+ * @brief 创建FIR滤波器参数估计RLS
+ * @param filterLength FIR滤波器长度
+ * @param forgettingFactor 遗忘因子（0.95-1.0）
+ * @param regularization 正则化参数
+ * @return 配置好的RLS滤波器
+ */
+template<int FilterLength>
+RLSFilter<fp32, FilterLength> createFIRRLS(fp32 forgettingFactor, fp32 regularization)
+{
+    return createARModelRLS<FilterLength>(forgettingFactor, regularization);
+}
+
+/**
+ * @brief 创建系统辨识RLS滤波器
+ * @details 用于辨识系统传递函数参数
+ * @param numParams 参数数量
+ * @param forgettingFactor 遗忘因子（0.95-1.0）
+ * @param regularization 正则化参数
+ * @return 配置好的RLS滤波器
+ */
+template<int NumParams>
+RLSFilter<fp32, NumParams> createSystemIdentificationRLS(fp32 forgettingFactor, fp32 regularization)
+{
+    RLSFilter<fp32, NumParams> rls(forgettingFactor, regularization);
+    
+    // 初始化参数向量为零
+    typename RLSFilter<fp32, NumParams>::ParameterVector params;
+    params.setZero();
+    rls.setInitialParameters(params);
+    
+    // 初始化协方差矩阵为单位矩阵
+    typename RLSFilter<fp32, NumParams>::CovarianceMatrix P;
+    P.setIdentity();
+    rls.setInitialCovariance(P);
+    
+    return rls;
+}
